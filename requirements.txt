@@ -1,0 +1,7 @@
+python-telegram-bot>=20.4
+httpx[http2]
+asyncio
+validators
+
+# twitter-api-client
+twitter-api-client @ git+https://github.com/junyilou/twitter-api-client@main

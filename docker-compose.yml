@@ -1,0 +1,12 @@
+version: '3.7'
+services:
+  twigram:
+    image: twigram:latest
+
+    environment:
+      - DEBUG=false
+      - TOKEN=""
+      - TWITTER_USER_NAME=""
+      - TWITTER_EMAIL=""
+      - TWITTER_PASSWORD=""
+      - TWITTER_COOKIE=""

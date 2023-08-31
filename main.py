@@ -7,14 +7,16 @@ Simple Bot to get the media and text from Twitter and forward them to Telegram.
 Press Ctrl-C on the command line or send a signal to the process to stop the bot.
 """
 
+import os
 import asyncio
+
 from telebot.bot import TelegramBot
-
-
-def app():
-    bot = TelegramBot()
-    asyncio.run(bot.run())
+from web.web import webserver
 
 
 if __name__ == '__main__':
-    app()
+    if os.environ.get('WEB_URL'):
+        asyncio.run(webserver())
+    else:
+        bot = TelegramBot()
+        asyncio.run(bot.run())

@@ -11,7 +11,7 @@ from lib.logger import logger
 from lib.utils import Session
 from twitterclient.twitter import TwitterClient
 
-version = '0.1'
+version = '0.2'
 message = ('*Tweet forward Bot*',
            f'Version: {version}\n',
            '*Usage:*',
@@ -23,16 +23,40 @@ message = ('*Tweet forward Bot*',
 class TelegramBot(object):
     def __init__(self, ):
         self.logger = logger
-        self.application = None
+        self.application = Application.builder().token(self.get_token()).build()
         self.debug = os.environ.get('DEBUG', False) in {'True', 'true', 'TRUE', '1'}
         self.client = TwitterClient(debug=self.debug)
         self.session = Session()
+        self.set_bot_handler()
 
     def run(self):
-        token = self.get_token()
+        _interval = os.environ.get('INTERVAL', 30.0)
+        try:
+            interval = float(_interval)
+        except ValueError:
+            self.logger.warning('INTERVAL is not a number, use default value 30')
+            interval = 30.0
 
-        self.application = Application.builder().token(token).build()
-        self.set_bot_handler()
+        self.application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=interval)
+
+    async def web(self, url):
+        self.logger.info('Setting webhook: %s', url)
+        result = await self.application.bot.set_webhook(url=url, allowed_updates=Update.ALL_TYPES)
+
+        if result:
+            self.logger.info('Webhook setup OK, URL: %s', url)
+        else:
+            self.logger.info('Webhook setup FAILED, URL: %s', url)
+            raise Exception('Webhook setup failed.')
+
+    async def task(self, request):
+        msg = await request.get_json()
+        self.logger.info('Message received: %s', msg)
+
+        update_result = await self.application.update_queue.put(Update.de_json(msg, self.application.bot))
+        self.logger.info('Queue added.')
+
+        return update_result
 
     def stop(self):
         self.application.stop()
@@ -47,19 +71,11 @@ class TelegramBot(object):
         return token
 
     def set_bot_handler(self):
-        _interval = os.environ.get('INTERVAL', 30.0)
-        try:
-            interval = float(_interval)
-        except ValueError:
-            self.logger.warning('INTERVAL is not a number, use default value 30')
-            interval = 30.0
         self.application.add_handler(CommandHandler('start', self.help))
         self.application.add_handler(CommandHandler('help', self.help))
         self.application.add_handler(CommandHandler('down', self.download))
         self.application.add_handler(CommandHandler('download', self.download))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.download))
-
-        self.application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=interval)
 
     @staticmethod
     async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):

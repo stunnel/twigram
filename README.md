@@ -4,6 +4,11 @@ This projects aims to make a [Telegram](https://telegram.org) bot that forwards 
 
 ## How to run
 
+If you provide `WEB_URL` and `PORT`, the bot will run a webhook server for Telegram server to send updates.  
+Otherwise, it will run a polling bot.
+
+As a webhook server, you must provide a https web with valid certificate, and can be accessed by Telegram server.
+
 ### Docker
 
 1. Clone this repo
@@ -14,13 +19,15 @@ This projects aims to make a [Telegram](https://telegram.org) bot that forwards 
 3. Run container:
     ```
     docker run -d --network host \
-        --name twigram --restart=al[docker-compose.yml](docker-compose.yml)ways \
+        --name twigram --restart=on-failure \
         -e TOKEN=<telegram_token> \
         -e INTERVAL=<interval_in_seconds> \
         -e TWITTER_USERNAME=<twitter_username> \
         -e TWITTER_EMAIL=<twitter_email> \
         -e TWITTER_PASSWORD=<twitter_password> \
         -e TWITTER_COOKIE=<twitter_token> \
+        -e WEB_URL=<https_web_url> \
+        -e PORT=8080 \
         -e DEBUG=false \
         twigram:latest
     ```
@@ -46,7 +53,7 @@ This projects aims to make a [Telegram](https://telegram.org) bot that forwards 
    [Unit]
    Description=Twigram - Telegram bot that forwards Twitter to Telegram
    After=syslog.target network-online.target nss-lookup.target
-   
+
    [Service]
    Type=simple
    Environment=TOKEN=<telegram_token>
@@ -55,10 +62,12 @@ This projects aims to make a [Telegram](https://telegram.org) bot that forwards 
    Environment=TWITTER_EMAIL=<twitter_email>
    Environment=TWITTER_PASSWORD=<twitter_password>
    Environment=TWITTER_COOKIE=<twitter_token>
+   Environment=WEB_URL=<https_web_url>
+   Environment=PORT=8080
    Environment=DEBUG=false
    ExecStart=/path/to/venv/bin/python /path/to/main.py
    Restart=always
-   
+
    [Install]
    WantedBy=multi-user.target
    ```

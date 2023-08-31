@@ -1,6 +1,8 @@
 python-telegram-bot>=20.4
 httpx[http2]
 asyncio
+uvicorn
+quart
 validators
 
 # twitter-api-client

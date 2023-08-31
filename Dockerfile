@@ -2,7 +2,7 @@
 FROM python:slim
 
 # Set work directory
-WORKDIR /app/tftb
+WORKDIR /app/twigram
 
 # Copy current directory into work directory
 COPY . /app/twigram/
@@ -19,7 +19,7 @@ EOF
 ENV DEBUG ""
 ENV TOKEN ""
 ENV INTERVAL "30"
-ENV TWITTER_USER_NAME ""
+ENV TWITTER_USERNAME ""
 ENV TWITTER_EMAIL ""
 ENV TWITTER_PASSWORD ""
 ENV TWITTER_COOKIE ""

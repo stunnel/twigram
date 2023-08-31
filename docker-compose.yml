@@ -6,7 +6,7 @@ services:
     environment:
       - DEBUG=false
       - TOKEN=""
-      - TWITTER_USER_NAME=""
+      - TWITTER_USERNAME=""
       - TWITTER_EMAIL=""
       - TWITTER_PASSWORD=""
       - TWITTER_COOKIE=""

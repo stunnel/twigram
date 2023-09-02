@@ -11,9 +11,12 @@ COPY . /app/twigram/
 RUN <<EOF
 apt-get update
 apt-get install -y git
+pip install --no-cache-dir -r requirements.txt
+apt-get remove -y git
+apt-get purge -y git
+apt-get autoremove -y
 apt-get clean all
 rm -rf /var/lib/apt/lists/*
-pip install --no-cache-dir -r requirements.txt
 EOF
 
 ENV DEBUG ""

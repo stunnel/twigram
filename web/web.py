@@ -23,6 +23,7 @@ async def webserver() -> None:
     @app.get('/')
     @app.get('/twigram')
     @app.get('/twigram/')
+    @app.get('/health')
     async def hello() -> Response:
         message = {'message': 'Hello World!', 'version': version}
         return jsonify(message)

@@ -14,9 +14,13 @@ from telebot.bot import TelegramBot
 from web.web import webserver
 
 
-if __name__ == '__main__':
+def app():
     if os.environ.get('WEB_URL'):
         asyncio.run(webserver())
     else:
         bot = TelegramBot()
         asyncio.run(bot.run())
+
+
+if __name__ == '__main__':
+    app()

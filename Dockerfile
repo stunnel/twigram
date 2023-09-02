@@ -18,9 +18,9 @@ EOF
 
 ENV DEBUG ""
 ENV TOKEN ""
-ENV INTERVAL "30"
-ENV WEB_URL ""
-ENV PORT "8080"
+ENV INTERVAL "30"           # interval for polling mode
+ENV WEB_URL ""              # you web url for webhook mode, e.g. https://twigram.example.com
+ENV PORT "8080"             # port for local listening, you need a reverse proxy to forward traffic to this port
 ENV TWITTER_USERNAME ""
 ENV TWITTER_EMAIL ""
 ENV TWITTER_PASSWORD ""

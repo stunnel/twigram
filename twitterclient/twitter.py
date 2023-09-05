@@ -186,6 +186,9 @@ class TwitterClient(object):
         """
         tweet = await self.get_tweet(tweet_id)
         tweet_result = tweet['data']['tweetResult']['result']
+        if 'legacy' not in tweet_result and 'tweet' in tweet_result:
+            tweet_result = tweet_result['tweet']
+
         image_urls, video_urls, remove_urls = [], [], []
         # remove_urls is the url of the image or video in the text, we will remove it later
         text, name, screen_name = '', '', ''

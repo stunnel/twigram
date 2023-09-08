@@ -10,6 +10,7 @@ COPY . /app/twigram/
 # Install git, clean apt cache and install python dependencies
 RUN <<EOF
 apt-get update
+apt-get upgrade -y
 apt-get install -y git
 pip install --no-cache-dir -r requirements.txt
 apt-get remove -y git
@@ -17,6 +18,7 @@ apt-get purge -y git
 apt-get autoremove -y
 apt-get clean all
 rm -rf /var/lib/apt/lists/*
+find / -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -delete
 EOF
 
 ENV DEBUG ""

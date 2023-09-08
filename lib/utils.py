@@ -71,3 +71,26 @@ class Session(httpx.AsyncClient):
         except Exception as e:
             logger.error(e)
             return url
+
+
+def split_long_string(input_string: str, max_length: int = 4096) -> list:
+    if len(input_string) <= max_length:
+        return [input_string]
+
+    result_strings = []
+    temp_lines = []
+    temp_length = 0
+
+    lines = input_string.splitlines()
+    for line in lines:
+        if temp_length + len(line) <= max_length:
+            temp_lines.append(line)
+            temp_length += len(line) + 1
+        else:
+            result_strings.append('\n'.join(temp_lines))
+            temp_lines = [line]
+            temp_length = len(line) + 1
+
+    result_strings.append('\n'.join(temp_lines))
+
+    return result_strings

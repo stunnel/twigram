@@ -8,16 +8,9 @@ from telegram import Update, InputMediaPhoto, InputMediaVideo
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 from lib.logger import logger
-from lib.utils import Session
+from lib.utils import Session, split_long_string
+from lib import version
 from twitterclient.twitter import TwitterClient
-
-version = '0.2'
-message = ('*Tweet forward Bot*',
-           f'Version: {version}\n',
-           '*Usage:*',
-           '`/down <url>`: Grab tweet and send to telegram.',
-           '`/start`: Show this message.',
-           '`/help`: Show this message.',)
 
 
 class TelegramBot(object):
@@ -30,12 +23,13 @@ class TelegramBot(object):
         self.set_bot_handler()
 
     def run(self):
-        _interval = os.environ.get('INTERVAL', 30.0)
+        interval_default = 30.0
+        _interval = os.environ.get('INTERVAL', interval_default)
         try:
             interval = float(_interval)
         except ValueError:
-            self.logger.warning('INTERVAL is not a number, use default value 30')
-            interval = 30.0
+            interval = interval_default
+            self.logger.warning('INTERVAL is not a number, use default value %s', interval)
 
         self.application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=interval)
 
@@ -82,7 +76,7 @@ class TelegramBot(object):
         """
         Send a message when the command /help is issued.
         """
-        text = '\n'.join(message)
+        text = '\n'.join(version.message)
         (text.replace('_', '\\_')
          .replace('*', '\\*')
          .replace('[', '\\[')
@@ -93,7 +87,7 @@ class TelegramBot(object):
     async def download(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         urls = await self.get_urls(update.message.text)
         if not urls:
-            await update.message.reply_text('Can\'t find any Twitter url in your message.', quote=True)
+            await self.reply_text(update, "Can't find any Twitter url in your message.")
         for url in urls:
             await self.download_twitter(update, url)
 
@@ -102,9 +96,20 @@ class TelegramBot(object):
         if len(images_path) + len(videos_path) > 0:
             await self.send_media(update=update, images_path=images_path, videos_path=videos_path, text=text)
         elif text:
-            await update.message.reply_text(text, quote=True, disable_web_page_preview=True)
+            await self.reply_text(update, text)
         else:
-            await update.message.reply_text('Download failed.', quote=True)
+            await self.reply_text(update, 'Download failed.')
+
+    @staticmethod
+    async def reply_text(update: Update, text: str):
+        quote = True
+        if len(text) <= 4096:
+            await update.message.reply_text(text, quote=quote, disable_web_page_preview=True)
+        else:
+            text_split = split_long_string(text)
+            for text_part in text_split:
+                await update.message.reply_text(text_part, quote=quote, disable_web_page_preview=True)
+                quote = False
 
     async def send_media(self, update: Update, images_path: [str], videos_path: [str], text: str = ''):
         medias = []
@@ -117,7 +122,7 @@ class TelegramBot(object):
 
         if len(text) > 1024:
             await update.message.reply_media_group(media=medias, quote=True)
-            await update.message.reply_text(text, quote=True, disable_web_page_preview=True)
+            await self.reply_text(update, text)
         else:
             await update.message.reply_media_group(media=medias, caption=text, quote=True)
 

@@ -4,8 +4,9 @@ import os
 import uvicorn
 from quart import Quart, Response, request, jsonify
 
-from telebot.bot import TelegramBot, version
+from telebot.bot import TelegramBot
 from lib.logger import logger
+from lib.version import version
 
 
 async def webserver() -> None:

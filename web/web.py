@@ -37,6 +37,12 @@ async def webserver() -> None:
 
         return jsonify(message)
 
+    @app.get('/twigram/<path>')
+    @app.post('/twigram/<path>')
+    async def unknown_bot(path: str) -> Response:
+        message = {'message': 'Unknown bot', 'version': version, 'path': path}
+        return jsonify(message)
+
     server = uvicorn.Server(
         config=uvicorn.Config(
             app=app,

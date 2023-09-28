@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 import sys
 
 import validators
-from telegram import Update, InputMediaPhoto, InputMediaVideo
+from telegram import Update, Message, InputMediaVideo, InputMediaDocument
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 from lib.logger import logger
 from lib.utils import Session, split_long_string
 from lib import version
 from twitterclient.twitter import TwitterClient
+
+_url_prefixes = (r'https://(?:www\.|mobile\.|m\.)?twitter\.com/', r'https://x\.com/')
 
 
 class TelegramBot(object):
@@ -19,6 +22,7 @@ class TelegramBot(object):
         self.application = Application.builder().token(self.get_token()).build()
         self.debug = os.environ.get('DEBUG', False) in {'True', 'true', 'TRUE', '1'}
         self.client = TwitterClient(debug=self.debug)
+        self.url_pattern = re.compile('|'.join(_url_prefixes))
         self.session = Session()
         self.set_bot_handler()
 
@@ -69,7 +73,7 @@ class TelegramBot(object):
         self.application.add_handler(CommandHandler('help', self.help))
         self.application.add_handler(CommandHandler('down', self.download))
         self.application.add_handler(CommandHandler('download', self.download))
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.download))
+        self.application.add_handler(MessageHandler((filters.TEXT | filters.CAPTION) & ~filters.COMMAND, self.download))
 
     @staticmethod
     async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,18 +81,15 @@ class TelegramBot(object):
         Send a message when the command /help is issued.
         """
         text = '\n'.join(version.message)
-        (text.replace('_', '\\_')
-         .replace('*', '\\*')
-         .replace('[', '\\[')
-         .replace('`', '\\`'))
+        escaped_text = re.sub(r'[_*`[]', r'\\\g<0>', text)
 
-        await update.message.reply_markdown(text, quote=False)
+        await update.message.reply_markdown(escaped_text, quote=False)
 
     async def download(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        urls = await self.get_urls(update.message.text)
+        urls = await self.get_urls(update.message)
         if not urls:
             await self.reply_text(update, "Can't find any Twitter url in your message.")
-        for url in urls:
+        for url in urls[:10]:   # limit to 10 urls
             await self.download_twitter(update, url)
 
     async def download_twitter(self, update: Update, url: str):
@@ -115,10 +116,10 @@ class TelegramBot(object):
         medias = []
 
         for image_path in images_path:
-            medias.append(InputMediaPhoto(media=open(image_path, 'rb')))
+            medias.append(InputMediaDocument(media=open(image_path, 'rb')))
 
         for video_path in videos_path:
-            medias.append(InputMediaVideo(media=open(video_path, 'rb')))
+            medias.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
 
         if len(text) > 1024:
             await update.message.reply_media_group(media=medias, quote=True)
@@ -137,23 +138,29 @@ class TelegramBot(object):
         for video_path in videos_path:
             os.remove(video_path)
 
-    async def get_urls(self, chat_msg: str) -> list:
+    async def get_urls(self, message: Message) -> list:
         urls = []
+        logger.debug(message)
 
-        chat_list = chat_msg.split()
-        for msg in chat_list:
-            if validators.url(msg):
-                msg = await self.session.url_strict(msg)  # follow URL redirect, remove tracking code
-                if (msg.startswith('https://twitter.com/')
-                        or msg.startswith('https://x.com/')
-                        or msg.startswith('https://mobile.twitter.com/')
-                        or msg.startswith('https://www.twitter.com/')
-                        or msg.startswith('https://m.twitter.com/')):
-                    urls.append(msg)
+        if message.text:
+            urls = await self.extract_url(message.text)
+        if not urls and message.caption:
+            urls = await self.extract_url(message.caption)
 
         if not urls:
             self.logger.error('URL not found.')
         else:
             self.logger.info('Get URL: %s', urls)
+
+        return urls
+
+    async def extract_url(self, text: str) -> list:
+        urls = []
+        test_split = text.split()
+        for msg in test_split:
+            if validators.url(msg):
+                msg = await self.session.url_strict(msg)  # follow URL redirect, remove tracking code
+                if self.url_pattern.match(msg):
+                    urls.append(msg)
 
         return urls

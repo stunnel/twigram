@@ -28,6 +28,9 @@ As a webhook server, you must provide a https web with valid certificate, and ca
 You can run in http mode and use a reverse proxy.  
 Or you can provide valid certificate and key, the bot will run in https.
 
+IMPORTANT: Ports currently supported for webhooks: 443, 80, 88, 8443.
+ref: https://core.telegram.org/bots/api#setwebhook
+
 ### Docker
 
 1. Clone this repo
@@ -50,6 +53,7 @@ Or you can provide valid certificate and key, the bot will run in https.
         -e CERT_FILE=<cert file> \
         -e KEY_FILE=<key file> \
         -e PORT=8080 \
+        -e PROCESS_COUNT=1 \
         -e DEBUG=false \
         twigram:latest
     ```
@@ -82,6 +86,7 @@ Or you can provide valid certificate and key, the bot will run in https.
    Environment=CERT_FILE=<cert file>
    Environment=KEY_FILE=<key file>
    Environment=PORT=8080
+   Environment=PROCESS_COUNT=1
    Environment=DEBUG=false
    ExecStart=/bin/bash run.sh
    Restart=always
@@ -125,6 +130,7 @@ Or you can provide valid certificate and key, the bot will run in https.
       --env "TWITTER_EMAIL=<twitter_email>" \
       --env "TWITTER_PASSWORD=<twitter_password>" \
       --env "TWITTER_COOKIE=<twitter_token>" \
+      --env "PROCESS_COUNT=1" \
       --env "DEBUG=false" \
       --image registry.fly.io/"${app_name}":latest
     ```

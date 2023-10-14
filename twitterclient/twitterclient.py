@@ -26,7 +26,7 @@ class TwitterClient(object):
         self.current_dir = os.getcwd()
         self.temp_dir = os.path.join(self.current_dir, 'temp')
         if not os.path.exists(self.temp_dir):
-            os.mkdir(self.temp_dir)
+            os.makedirs(self.temp_dir, exist_ok=True)
 
         self.scraper = self.twitter_account()  # create scraper using session
         self.session = Session()

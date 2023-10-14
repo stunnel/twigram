@@ -28,11 +28,12 @@ ENV INTERVAL "30"           # interval for polling mode
 ENV WEB_URL_ENABLE ""       # enable webhook mode, set to True/TRUE to enable
 ENV WEB_URL ""              # your web url for webhook mode, e.g. https://twigram.example.com
 ENV PORT "8080"             # port for local listening, you need a reverse proxy to forward traffic to this port
+ENV CERT_FILE ""
+ENV KEY_FILE ""
 ENV TWITTER_USERNAME ""
 ENV TWITTER_EMAIL ""
 ENV TWITTER_PASSWORD ""
 ENV TWITTER_COOKIE ""
-ENV CERT_FILE ""
-ENV KEY_FILE ""
+ENV PROCESS_COUNT 1
 
 CMD /app/twigram/run.sh

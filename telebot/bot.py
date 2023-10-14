@@ -8,16 +8,18 @@ import validators
 from telegram import Update, Message, InputMediaVideo, InputMediaDocument
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
+from lib.lock import FileLock
 from lib.logger import logger
 from lib.utils import Session, split_long_string
 from lib import version
-from twitterclient.twitter import TwitterClient
+from twitterclient.twitterclient import TwitterClient
 
 _url_prefixes = (r'https://(?:www\.|mobile\.|m\.)?twitter\.com/', r'https://x\.com/')
 
 
 class TelegramBot(object):
     def __init__(self, ):
+        self.webhook_lock = FileLock('/tmp/twigram.lock')
         self.logger = logger
         self.application = Application.builder().token(self.get_token()).build()
         self.debug = os.environ.get('DEBUG', False) in {'True', 'true', 'TRUE', '1'}
@@ -35,17 +37,33 @@ class TelegramBot(object):
             interval = interval_default
             self.logger.warning('INTERVAL is not a number, use default value %s', interval)
 
-        self.application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=interval)
+        self.application.run_polling(allowed_updates=Update.MESSAGE, poll_interval=interval)
 
     async def web(self, url):
         self.logger.info('Setting webhook: %s', url)
-        result = await self.application.bot.set_webhook(url=url, allowed_updates=Update.ALL_TYPES)
 
-        if result:
-            self.logger.info('Webhook setup OK, URL: %s', url)
+        # Check if webhook is already configured, avoid API response 429 Too Many Requests
+        # See https://core.telegram.org/bots/api#setwebhook
+        webhook_info = await self.application.bot.get_webhook_info()
+        if webhook_info:
+            if webhook_info.url == url:
+                self.logger.info('Webhook already configured.')
+                return
+
+        lock_acquired = self.webhook_lock.acquire()
+        if lock_acquired:
+            result = await self.application.bot.set_webhook(url=url, allowed_updates=Update.MESSAGE)
+
+            if result:
+                self.logger.info('Webhook setup OK, URL: %s', url)
+            else:
+                self.logger.info('Webhook setup FAILED, URL: %s', url)
+                raise Exception('Webhook setup failed.')
+
+            self.webhook_lock.release()
         else:
-            self.logger.info('Webhook setup FAILED, URL: %s', url)
-            raise Exception('Webhook setup failed.')
+            self.logger.info('Acquire lock failed, other process is setting webhook.')
+            return
 
     async def run(self):
         self.logger.info(f'Starting bot')

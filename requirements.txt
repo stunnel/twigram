@@ -1,9 +1,10 @@
-python-telegram-bot>=20.4
+python-telegram-bot>=20.6
 httpx[http2]
 asyncio
 uvicorn
 quart
 validators
+gunicorn
 
 # twitter-api-client
 twitter-api-client @ git+https://github.com/junyilou/twitter-api-client@main

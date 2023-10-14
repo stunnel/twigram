@@ -3,8 +3,8 @@
 import os
 import re
 import sys
-
 import validators
+
 from telegram import Update, Message, InputMediaVideo, InputMediaDocument
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -26,7 +26,7 @@ class TelegramBot(object):
         self.session = Session()
         self.set_bot_handler()
 
-    def run(self):
+    def poll(self):
         interval_default = 30.0
         _interval = os.environ.get('INTERVAL', interval_default)
         try:
@@ -47,17 +47,23 @@ class TelegramBot(object):
             self.logger.info('Webhook setup FAILED, URL: %s', url)
             raise Exception('Webhook setup failed.')
 
+    async def run(self):
+        self.logger.info(f'Starting bot')
+        if os.environ.get('WEB_URL_ENABLE') in {'True', 'true', 'TRUE', '1'}:
+            web_url = os.environ.get('WEB_URL')
+            webhook_url = '{}/twigram/{}/down'.format(web_url, self.get_token())
+            self.logger.info(f'Starting bot in webhook mode with url: {web_url}/twigram/TOKEN/down')
+            await self.web(webhook_url)
+        else:
+            self.logger.info('Starting bot in polling mode')
+            self.poll()
+
     async def task(self, request):
         msg = await request.get_json()
         self.logger.info('Message received: %s', msg)
 
-        update_result = await self.application.update_queue.put(Update.de_json(msg, self.application.bot))
+        await self.application.update_queue.put(Update.de_json(msg, self.application.bot))
         self.logger.info('Queue added.')
-
-        return update_result
-
-    def stop(self):
-        self.application.stop()
 
     def get_token(self) -> str:
         token = os.environ.get('TOKEN', None)
@@ -75,13 +81,13 @@ class TelegramBot(object):
         self.application.add_handler(CommandHandler('download', self.download))
         self.application.add_handler(MessageHandler((filters.TEXT | filters.CAPTION) & ~filters.COMMAND, self.download))
 
-    @staticmethod
-    async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Send a message when the command /help is issued.
         """
         text = '\n'.join(version.message)
         escaped_text = re.sub(r'[_*`[]', r'\\\g<0>', text)
+        self.logger.info(escaped_text)
 
         await update.message.reply_markdown(escaped_text, quote=False)
 
@@ -140,7 +146,7 @@ class TelegramBot(object):
 
     async def get_urls(self, message: Message) -> list:
         urls = []
-        logger.debug(message)
+        self.logger.debug(message)
 
         if message.text:
             urls = await self.extract_url(message.text)

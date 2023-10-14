@@ -1,5 +1,5 @@
 # Use python:slim as base image
-FROM python:slim
+FROM python:3.11-slim
 
 # Set work directory
 WORKDIR /app/twigram
@@ -19,16 +19,20 @@ apt-get autoremove -y
 apt-get clean all
 rm -rf /var/lib/apt/lists/*
 find / -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -delete
+chmod +x /app/twigram/run.sh
 EOF
 
 ENV DEBUG ""
 ENV TOKEN ""
 ENV INTERVAL "30"           # interval for polling mode
-ENV WEB_URL ""              # you web url for webhook mode, e.g. https://twigram.example.com
+ENV WEB_URL_ENABLE ""       # enable webhook mode, set to True/TRUE to enable
+ENV WEB_URL ""              # your web url for webhook mode, e.g. https://twigram.example.com
 ENV PORT "8080"             # port for local listening, you need a reverse proxy to forward traffic to this port
 ENV TWITTER_USERNAME ""
 ENV TWITTER_EMAIL ""
 ENV TWITTER_PASSWORD ""
 ENV TWITTER_COOKIE ""
+ENV CERT_FILE ""
+ENV KEY_FILE ""
 
-CMD ["python3", "main.py"]
+CMD /app/twigram/run.sh

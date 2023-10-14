@@ -23,6 +23,7 @@ class TelegramBot(object):
         self.logger = logger
         self.application = Application.builder().token(self.get_token()).build()
         self.debug = os.environ.get('DEBUG', False) in {'True', 'true', 'TRUE', '1'}
+        self.quote = os.environ.get('QUOTE', False) in {'True', 'true', 'TRUE', '1'}
         self.client = TwitterClient(debug=self.debug)
         self.url_pattern = re.compile('|'.join(_url_prefixes))
         self.session = Session()
@@ -107,7 +108,7 @@ class TelegramBot(object):
         escaped_text = re.sub(r'[_*`[]', r'\\\g<0>', text)
         self.logger.info(escaped_text)
 
-        await update.message.reply_markdown(escaped_text, quote=False)
+        await update.message.reply_markdown(escaped_text, quote=self.quote)
 
     async def download(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         urls = await self.get_urls(update.message)
@@ -125,9 +126,8 @@ class TelegramBot(object):
         else:
             await self.reply_text(update, 'Download failed.')
 
-    @staticmethod
-    async def reply_text(update: Update, text: str):
-        quote = True
+    async def reply_text(self, update: Update, text: str):
+        quote = self.quote
         if len(text) <= 4096:
             await update.message.reply_text(text, quote=quote, disable_web_page_preview=True)
         else:
@@ -146,10 +146,10 @@ class TelegramBot(object):
             medias.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
 
         if len(text) > 1024:
-            await update.message.reply_media_group(media=medias, quote=True)
+            await update.message.reply_media_group(media=medias, quote=self.quote)
             await self.reply_text(update, text)
         else:
-            await update.message.reply_media_group(media=medias, caption=text, quote=True)
+            await update.message.reply_media_group(media=medias, caption=text, quote=self.quote)
 
         if not self.debug:
             await self.delete_files(images_path, videos_path)

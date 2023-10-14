@@ -8,7 +8,7 @@ services:
       - TOKEN=""
       - INTERVAL=30           # interval for polling mode
       - WEB_URL=""            # you web url for webhook mode, e.g. https://twigram.example.com
-      - PORT=8080             # port for local listening, you need a reverse proxy to forward traffic to this port
+      - PORT=58081            # port for local listening, you need a reverse proxy to forward traffic to this port
       - TWITTER_USERNAME=""
       - TWITTER_EMAIL=""
       - TWITTER_PASSWORD=""

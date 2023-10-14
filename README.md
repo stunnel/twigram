@@ -48,13 +48,14 @@ ref: https://core.telegram.org/bots/api#setwebhook
         -e TWITTER_EMAIL=<twitter_email> \
         -e TWITTER_PASSWORD=<twitter_password> \
         -e TWITTER_COOKIE=<twitter_token> \
-        -e WEB_URL_ENABLE=<TRUE or FALSE> \
+        -e WEB_URL_ENABLE=<True or False> \
         -e WEB_URL=<https_web_url> \
         -e CERT_FILE=<cert file> \
         -e KEY_FILE=<key file> \
         -e PORT=8080 \
         -e PROCESS_COUNT=1 \
-        -e DEBUG=false \
+        -e QUOTE=False \
+        -e DEBUG=False \
         twigram:latest
     ```
 
@@ -81,13 +82,14 @@ ref: https://core.telegram.org/bots/api#setwebhook
    Environment=TWITTER_EMAIL=<twitter_email>
    Environment=TWITTER_PASSWORD=<twitter_password>
    Environment=TWITTER_COOKIE=<twitter_token>
-   Environment=WEB_URL_ENABLE=<TRUE or FALSE>
+   Environment=WEB_URL_ENABLE=<True or False>
    Environment=WEB_URL=<https_web_url>
    Environment=CERT_FILE=<cert file>
    Environment=KEY_FILE=<key file>
    Environment=PORT=8080
    Environment=PROCESS_COUNT=1
-   Environment=DEBUG=false
+   Environment=DEBUG=False
+   Environment=QUOTE=False
    ExecStart=/bin/bash run.sh
    Restart=always
 
@@ -118,7 +120,7 @@ ref: https://core.telegram.org/bots/api#setwebhook
     ```
     flyctl deploy --app "${app_name}" \
       --env "TOKEN=1423456789:AAAA" \
-      --env "WEB_URL_ENABLE=<TRUE or FALSE>" \
+      --env "WEB_URL_ENABLE=<True or False>" \
       --env "WEB_URL=https://${app_name}.fly.dev" \
       --env "CERT_FILE=<cert file>" \
       --env "KEY_FILE=<key file>" \
@@ -131,6 +133,7 @@ ref: https://core.telegram.org/bots/api#setwebhook
       --env "TWITTER_PASSWORD=<twitter_password>" \
       --env "TWITTER_COOKIE=<twitter_token>" \
       --env "PROCESS_COUNT=1" \
+      --env "QUOTE=False" \
       --env "DEBUG=false" \
       --image registry.fly.io/"${app_name}":latest
     ```

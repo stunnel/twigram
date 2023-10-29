@@ -143,7 +143,10 @@ class TelegramBot(object):
             medias.append(InputMediaDocument(media=open(image_path, 'rb')))
 
         for video_path in videos_path:
-            medias.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
+            if images_path:
+                medias.append(InputMediaDocument(media=open(video_path, 'rb')))
+            else:
+                medias.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
 
         if len(text) > 1024:
             await update.message.reply_media_group(media=medias, quote=self.quote)

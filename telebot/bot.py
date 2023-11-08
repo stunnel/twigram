@@ -149,10 +149,10 @@ class TelegramBot(object):
                 medias.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
 
         if len(text) > 1024:
-            await update.message.reply_media_group(media=medias, quote=self.quote)
+            await update.message.reply_media_group(media=medias, quote=self.quote, write_timeout=600)
             await self.reply_text(update, text)
         else:
-            await update.message.reply_media_group(media=medias, caption=text, quote=self.quote)
+            await update.message.reply_media_group(media=medias, caption=text, quote=self.quote, write_timeout=600)
 
         if not self.debug:
             await self.delete_files(images_path, videos_path)

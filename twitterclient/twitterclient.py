@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import re
+import asyncio
 from urllib.parse import urlparse
 
 from twitter.scraper import Scraper
@@ -137,7 +138,8 @@ class TwitterClient(object):
         :return:
         """
         logger.info(f'Downloading tweet: {tweet_id}')
-        tweets = await self.scraper.tweets_by_id([tweet_id])
+        loop = asyncio.get_event_loop()
+        tweets = await loop.run_in_executor(None, self.scraper.tweets_by_id, [tweet_id])
         return tweets[0]
 
     async def get_largest_video(self, video_infos: list[dict]) -> str:

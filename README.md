@@ -142,5 +142,4 @@ ref: https://core.telegram.org/bots/api#setwebhook
 
 This is based on former work:
 - [python-telegram-bot](https://github.com/leandrotoledo/python-telegram-bot)
-- [twitter-api-client](https://github.com/trevorhobenshield/twitter-api-client)  
-   The [forked](https://github.com/junyilou/twitter-api-client) version deprecated `asyncio.run`
+- [twitter-api-client](https://github.com/trevorhobenshield/twitter-api-client)

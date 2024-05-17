@@ -11,6 +11,7 @@ class Session(httpx.AsyncClient):
         self.default_header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Mac OS X 10_15_7) '
                                              'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
         self.twitter_set = {'twitter.com', 'www.twitter.com', 'mobile.twitter.com', 'x.com', 'www.x.com'}
+        self.x_set = {'x.com', 'www.x.com'}
         limits = httpx.Limits(max_connections=connections * 2, max_keepalive_connections=connections)
         http_transport = httpx.AsyncHTTPTransport(http2=True, retries=retries, verify=False, limits=limits)
 
@@ -50,6 +51,10 @@ class Session(httpx.AsyncClient):
             x = max_times or 0
             x += 1
             if x > 5:
+                return url
+
+            url_parse = urlparse(url)
+            if url_parse.hostname in self.x_set:
                 return url
 
             response = await self.session.get(url, follow_redirects=False)

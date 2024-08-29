@@ -115,6 +115,7 @@ class TwitterClient(object):
         images_path = await self.download_images(images_url, tweet_id)
         videos_path = await self.download_videos(videos_url, tweet_id)
 
+        text = '{}\n\n{}'.format(text, tweet_url)
         return images_path, videos_path, text
 
     def get_tweet_id(self, url: str) -> int:

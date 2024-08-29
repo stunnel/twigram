@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import httpx
+import re
 from urllib.parse import urlparse
 
 from lib.logger import logger
@@ -11,6 +12,9 @@ class Session(httpx.AsyncClient):
         self.default_header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Mac OS X 10_15_7) '
                                              'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
         self.twitter_set = {'twitter.com', 'www.twitter.com', 'mobile.twitter.com', 'x.com', 'www.x.com'}
+        self.replace_domain_set = {'fixupx.com', 'vxtwitter.com', 'g.fixupx.com', 'g.vxtwitter.com',
+                                   't.fixupx.com', 't.vxtwitter.com', 'd.fixupx.com', 'd.vxtwitter.com'}
+        self.tweet_pattern = r'^/([^/]+)/status/(\d+)'
         self.x_set = {'x.com', 'www.x.com'}
         limits = httpx.Limits(max_connections=connections * 2, max_keepalive_connections=connections)
         http_transport = httpx.AsyncHTTPTransport(http2=True, retries=retries, verify=False, limits=limits)
@@ -39,10 +43,14 @@ class Session(httpx.AsyncClient):
         """
 
         url_parse = urlparse(url)
+        url_result = url
         if url_parse.hostname in self.twitter_set:
-            url_result = '{}://{}{}'.format(url_parse.scheme, url_parse.hostname, url_parse.path)
-        else:
-            url_result = url
+            url_result = '{}://{}{}'.format('https', url_parse.hostname, url_parse.path)
+        elif url_parse.hostname in self.replace_domain_set:
+            match = re.match(self.tweet_pattern, url_parse.path)
+            if match:
+                path_result = '/{}/status/{}'.format(match.group(1), match.group(2))
+                url_result = '{}://{}{}'.format('https', 'x.com', path_result)
 
         return url_result
 

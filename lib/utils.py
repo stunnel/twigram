@@ -12,8 +12,10 @@ class Session(httpx.AsyncClient):
         self.default_header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Mac OS X 10_15_7) '
                                              'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36'}
         self.twitter_set = {'twitter.com', 'www.twitter.com', 'mobile.twitter.com', 'x.com', 'www.x.com'}
-        self.replace_domain_set = {'fixupx.com', 'vxtwitter.com', 'g.fixupx.com', 'g.vxtwitter.com',
-                                   't.fixupx.com', 't.vxtwitter.com', 'd.fixupx.com', 'd.vxtwitter.com'}
+        self.replace_domain_set = {'fixupx.com',    't.fixupx.com',    'g.fixupx.com',    'd.fixupx.com',
+                                   'fxtwitter.com', 't.fxtwitter.com', 'g.fxtwitter.com', 'd.fxtwitter.com',
+                                   'vxtwitter.com', 't.vxtwitter.com', 'g.vxtwitter.com', 'd.vxtwitter.com',
+                                   'fixvx.com',     't.fixvx.com',     'g.fixvx.com',     'd.fixvx.com'}
         self.tweet_pattern = r'^/([^/]+)/status/(\d+)'
         self.x_set = {'x.com', 'www.x.com'}
         limits = httpx.Limits(max_connections=connections * 2, max_keepalive_connections=connections)

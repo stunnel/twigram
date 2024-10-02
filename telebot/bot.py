@@ -173,6 +173,8 @@ class TelegramBot(object):
             urls = await self.extract_url(message.text)
         if not urls and message.caption:
             urls = await self.extract_url(message.caption)
+        if not urls and message.link_preview_options and message.link_preview_options.url:
+            urls = await self.extract_url(message.link_preview_options.url)
 
         if not urls:
             self.logger.error('URL not found.')

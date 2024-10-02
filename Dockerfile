@@ -11,7 +11,7 @@ COPY . /app/twigram/
 RUN <<EOF
 apt-get update
 apt-get upgrade -y
-apt-get install -y git
+apt-get install -y git curl
 pip install --no-cache-dir -r requirements.txt
 apt-get remove -y git
 apt-get purge -y git
@@ -40,5 +40,8 @@ ENV TWITTER_PASSWORD=""
 ENV TWITTER_COOKIE=""
 ENV PROCESS_COUNT=1
 ENV QUOTE="False"
+
+HEALTHCHECK --interval=1m --timeout=3s \
+  CMD curl --silent --fail http://127.0.0.1:58081/health || exit 1
 
 CMD /app/twigram/run.sh

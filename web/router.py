@@ -31,7 +31,7 @@ async def stop():
 @app.get('/twigram/')
 @app.get('/health')
 async def hello() -> Response:
-    message = {'message': 'Hello World!', 'version': version}
+    message = {'message': 'Bot works!', 'version': version}
     return jsonify(message)
 
 

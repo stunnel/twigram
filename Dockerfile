@@ -1,5 +1,5 @@
 # Use python:slim as base image
-FROM python:3.12-slim
+FROM python:slim
 
 # Set work directory
 WORKDIR /app/twigram

@@ -211,9 +211,9 @@ class TwitterClient(object):
                             remove_urls.append(media['url'])
                 elif media_type == 'photo':
                     if 'media_url_https' in media:
-                        image_urls.append(media['media_url_https'])
+                        image_urls.append('{}?name=4096x4096'.format(media['media_url_https']))
                     if 'url' in media:
-                        remove_urls.append(media['url'])
+                        remove_urls.append('{}?name=4096x4096'.format(media['url']))
 
         if ('core' in tweet_result
                 and 'user_results' in tweet_result['core']

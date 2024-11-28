@@ -213,7 +213,7 @@ class TwitterClient(object):
                     if 'media_url_https' in media:
                         image_urls.append('{}?name=4096x4096'.format(media['media_url_https']))
                     if 'url' in media:
-                        remove_urls.append('{}?name=4096x4096'.format(media['url']))
+                        remove_urls.append(media['url'])
 
         if ('core' in tweet_result
                 and 'user_results' in tweet_result['core']

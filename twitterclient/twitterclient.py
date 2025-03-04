@@ -104,7 +104,7 @@ class TwitterClient(object):
         logger.info('Twitter scraper created from guest session')
         return Scraper(session=session, **self.default_params)
 
-    async def download(self, tweet_url: str) -> (list, list, str):
+    async def download(self, tweet_url: str) -> tuple[list, list, str]:
         """
         Download images, videos and text from tweet url
         :param tweet_url:
@@ -181,7 +181,7 @@ class TwitterClient(object):
 
         return await self.get_largest_video(video_infos)
 
-    async def get_media_url(self, tweet_id: int) -> (list, list, str):
+    async def get_media_url(self, tweet_id: int) -> tuple[list, list, str]:
         """
         Get image and video url from tweet id
         :param tweet_id:
@@ -251,7 +251,7 @@ class TwitterClient(object):
         return image_urls, video_urls, text
 
     @staticmethod
-    def remove_media_link_in_text(text: str, remove_urls: [str]) -> str:
+    def remove_media_link_in_text(text: str, remove_urls: list[str]) -> str:
         """
         Remove the url of the image or video in the text
         :param text:
@@ -268,7 +268,7 @@ class TwitterClient(object):
 
         return text
 
-    async def download_images(self, images_urls: list, tweet_id: int = 0) -> list:
+    async def download_images(self, images_urls: list[str], tweet_id: int = 0) -> list:
         """
         Download images
         :param images_urls:

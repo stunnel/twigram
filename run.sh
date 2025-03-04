@@ -5,7 +5,7 @@ PROCESS_COUNT=${PROCESS_COUNT:-1}
 if [ -f "${CERT_FILE}" ] && [ -f "${KEY_FILE}" ]; then
     gunicorn -b "0.0.0.0:$PORT" main:app \
         -k uvicorn.workers.UvicornWorker -w "${PROCESS_COUNT}" \
-        --certfile="${CERT_FILE}" --keyfile="${KEY_FILE}"
+        --certfile="${CERT_FILE}" --keyfile="${KEY_FILE}" --timeout=600
 else
-    gunicorn -b "0.0.0.0:$PORT" main:app -k uvicorn.workers.UvicornWorker -w "${PROCESS_COUNT}"
+    gunicorn -b "0.0.0.0:$PORT" main:app -k uvicorn.workers.UvicornWorker -w "${PROCESS_COUNT}" --timeout=600
 fi

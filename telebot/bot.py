@@ -136,7 +136,7 @@ class TelegramBot(object):
                 await update.message.reply_text(text_part, quote=quote, disable_web_page_preview=True)
                 quote = False
 
-    async def send_media(self, update: Update, images_path: [str], videos_path: [str], text: str = ''):
+    async def send_media(self, update: Update, images_path: list[str], videos_path: list[str], text: str = ''):
         async def relpy_media_group(caption: str = ''):
             if medias_image or medias_video:
                 if total_size > 50 * 1024**2:
@@ -179,7 +179,7 @@ class TelegramBot(object):
             await self.delete_files(images_path, videos_path)
 
     @staticmethod
-    async def delete_files(images_path: [str], videos_path: [str]):
+    async def delete_files(images_path: list[str], videos_path: list[str]):
         for image_path in images_path:
             os.remove(image_path)
 

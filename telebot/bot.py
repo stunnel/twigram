@@ -137,22 +137,43 @@ class TelegramBot(object):
                 quote = False
 
     async def send_media(self, update: Update, images_path: [str], videos_path: [str], text: str = ''):
-        medias = []
+        async def relpy_media_group(caption: str = ''):
+            if medias_image or medias_video:
+                if total_size > 50 * 1024**2:
+                    self.logger.info('Media group too large, send separately.')
+                    if medias_image:
+                        await update.message.reply_media_group(media=medias_image, caption=caption,
+                                                               quote=self.quote, write_timeout=600)
+                    if medias_video:
+                        for i in range(len(medias_video)):
+                            caption_temp = caption if i == 0 else ''
+                            await update.message.reply_media_group(media=[medias_video[i]], caption=caption_temp,
+                                                                   quote=self.quote, write_timeout=600)
+                else:
+                    medias = medias_image + medias_video
+                    await update.message.reply_media_group(media=medias, caption=caption,
+                                                           quote=self.quote, write_timeout=600)
 
-        for image_path in images_path:
-            medias.append(InputMediaDocument(media=open(image_path, 'rb')))
+        medias_image, medias_video = [], []
+        total_size = 0
+
+        if images_path:
+            for image_path in images_path:
+                total_size += os.path.getsize(image_path)
+                medias_image.append(InputMediaDocument(media=open(image_path, 'rb')))
 
         for video_path in videos_path:
+            total_size += os.path.getsize(video_path)
             if images_path:
-                medias.append(InputMediaDocument(media=open(video_path, 'rb')))
+                medias_video.append(InputMediaDocument(media=open(video_path, 'rb')))
             else:
-                medias.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
+                medias_video.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
 
         if len(text) > 1024:
-            await update.message.reply_media_group(media=medias, quote=self.quote, write_timeout=600)
+            await relpy_media_group()
             await self.reply_text(update, text)
         else:
-            await update.message.reply_media_group(media=medias, caption=text, quote=self.quote, write_timeout=600)
+            await relpy_media_group(caption=text)
 
         if not self.debug:
             await self.delete_files(images_path, videos_path)

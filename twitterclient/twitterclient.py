@@ -139,9 +139,32 @@ class TwitterClient(object):
         :return:
         """
         logger.info(f'Downloading tweet: {tweet_id}')
-        loop = asyncio.get_event_loop()
-        tweets = await loop.run_in_executor(None, self.scraper.tweets_by_id, [tweet_id])
-        return tweets[0]
+        retries = 0
+        max_retries = 10
+
+        while retries < max_retries:
+            try:
+                loop = asyncio.get_event_loop()
+                tweets = await loop.run_in_executor(None, self.scraper.tweets_by_id, [tweet_id])
+
+                if tweets:
+                    return tweets[0]
+
+                # Tweet not found, log and retry
+                retries += 1
+                logger.info(f'Tweet {tweet_id} not found, retrying... ({retries}/{max_retries})')
+
+            except Exception as e:
+                retries += 1
+                logger.info(f'Error fetching tweet {tweet_id}: {e}, retrying... ({retries}/{max_retries})')
+
+            # Wait with exponential backoff before retrying
+            await asyncio.sleep(2 * retries)
+
+        # After max retries, raise appropriate error
+        if tweets is not None and not tweets:
+            raise ValueError(f'Tweet {tweet_id} not found after {max_retries} attempts')
+        raise Exception(f'Failed to fetch tweet {tweet_id} after {max_retries} attempts')
 
     async def get_largest_video(self, video_infos: list[dict]) -> str:
         """
@@ -187,14 +210,14 @@ class TwitterClient(object):
         :param tweet_id:
         :return:
         """
+        image_urls, video_urls, remove_urls = [], [], []
+        # remove_urls is the url of the image or video in the text, we will remove it later
+        text, name, screen_name = '', '', ''
+
         tweet = await self.get_tweet(tweet_id)
         tweet_result = tweet['data']['tweetResult']['result']
         if 'legacy' not in tweet_result and 'tweet' in tweet_result:
             tweet_result = tweet_result['tweet']
-
-        image_urls, video_urls, remove_urls = [], [], []
-        # remove_urls is the url of the image or video in the text, we will remove it later
-        text, name, screen_name = '', '', ''
 
         if ('legacy' in tweet_result
                 and 'extended_entities' in tweet_result['legacy']

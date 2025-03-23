@@ -175,12 +175,27 @@ class TwitterClient(object):
         video_url = ''
 
         for video_info in video_infos:
-            resp = await self.session.head(video_info['url'])
-            if resp.status_code == 200:
-                content_length = int(resp.headers.get('Content-Length', 0))
-                if bitrate < content_length <= self.size_limit:
-                    bitrate = content_length
-                    video_url = video_info['url']
+            if bitrate <= video_info.get('bitrate', 0) <= self.size_limit:
+                video_url = video_info.get('url', '')                
+
+        if not video_url:
+            for video_info in video_infos:
+                resp = await self.session.head(video_info['url'])
+                if resp.status_code == 200:
+                    content_length = int(resp.headers.get('Content-Length', 0))
+                    if bitrate < content_length <= self.size_limit:
+                        bitrate = content_length
+                        video_url = video_info['url']
+                        logger.info(f'Video {video_info["url"]} size {content_length} set as largest video')
+                    else:
+                        logger.info(f'Video {video_info["url"]} size {content_length} bytes is smaller than {bitrate} bytes')
+                else:
+                    logger.info(f'Video {video_info["url"]} status code {resp.status_code}')
+
+        if video_url:
+            logger.info(f'Largest video url: {video_url}')
+        else:
+            logger.info(f'No video available from {video_infos}')
 
         return video_url
 

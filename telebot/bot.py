@@ -108,7 +108,7 @@ class TelegramBot(object):
         escaped_text = re.sub(r'[_*`[]', r'\\\g<0>', text)
         self.logger.info(escaped_text)
 
-        await update.message.reply_markdown(escaped_text, quote=self.quote)
+        await update.message.reply_markdown(escaped_text, do_quote=self.quote)
 
     async def download(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         urls = await self.get_urls(update.message)
@@ -129,11 +129,11 @@ class TelegramBot(object):
     async def reply_text(self, update: Update, text: str):
         quote = self.quote
         if len(text) <= 4096:
-            await update.message.reply_text(text, quote=quote, disable_web_page_preview=True)
+            await update.message.reply_text(text, do_quote=quote, disable_web_page_preview=True)
         else:
             text_split = split_long_string(text)
             for text_part in text_split:
-                await update.message.reply_text(text_part, quote=quote, disable_web_page_preview=True)
+                await update.message.reply_text(text_part, do_quote=quote, disable_web_page_preview=True)
                 quote = False
 
     async def send_media(self, update: Update, images_path: list[str], videos_path: list[str], text: str = ''):
@@ -143,16 +143,16 @@ class TelegramBot(object):
                     self.logger.info('Media group too large, send separately.')
                     if medias_image:
                         await update.message.reply_media_group(media=medias_image, caption=caption,
-                                                               quote=self.quote, write_timeout=600)
+                                                               do_quote=self.quote, write_timeout=600)
                     if medias_video:
                         for i in range(len(medias_video)):
                             caption_temp = caption if i == 0 else ''
                             await update.message.reply_media_group(media=[medias_video[i]], caption=caption_temp,
-                                                                   quote=self.quote, write_timeout=600)
+                                                                   do_quote=self.quote, write_timeout=600)
                 else:
                     medias = medias_image + medias_video
                     await update.message.reply_media_group(media=medias, caption=caption,
-                                                           quote=self.quote, write_timeout=600)
+                                                           do_quote=self.quote, write_timeout=600)
 
         medias_image, medias_video = [], []
         total_size = 0

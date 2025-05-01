@@ -6,3 +6,4 @@ quart
 validators
 gunicorn
 twitter-api-client
+unshortenit

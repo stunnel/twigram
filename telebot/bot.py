@@ -5,7 +5,8 @@ import re
 import sys
 import validators
 
-from telegram import Update, Message, InputMediaVideo, InputMediaDocument
+from telegram import Update, Message, MessageEntity, InputMediaVideo, InputMediaDocument
+from telegram.constants import ChatType
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 from lib.lock import FileLock
@@ -114,7 +115,13 @@ class TelegramBot(object):
     async def download(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         urls = await self.get_urls(update.message)
         if not urls:
+            is_group_chat = update.effective_chat and update.effective_chat.type in (
+                ChatType.GROUP, ChatType.SUPERGROUP
+            )
+            if is_group_chat and not self.is_bot_mentioned(update.message, context):
+                return
             await self.reply_text(update, "Can't find any Twitter url in your message.")
+            return
         for url in urls[:10]:   # limit to 10 urls
             await self.download_twitter(update, url)
 
@@ -137,6 +144,24 @@ class TelegramBot(object):
             for text_part in text_split:
                 await update.message.reply_text(text_part, do_quote=quote, disable_web_page_preview=True)
                 quote = False
+
+    @staticmethod
+    def is_bot_mentioned(message: Message, context: ContextTypes.DEFAULT_TYPE) -> bool:
+        bot_username = context.bot.username
+        if not bot_username:
+            return False
+
+        mention = f'@{bot_username}'.casefold()
+        entity_types = [MessageEntity.MENTION, MessageEntity.BOT_COMMAND]
+        entity_texts = list(message.parse_entities(types=entity_types).values())
+        entity_texts.extend(message.parse_caption_entities(types=entity_types).values())
+
+        for entity_text in entity_texts:
+            entity_text = entity_text.casefold()
+            if entity_text == mention or entity_text.endswith(mention):
+                return True
+
+        return False
 
     async def send_media(self, update: Update, images_path: list[str], videos_path: list[str], text: str = ''):
         async def relpy_media_group(caption: str = ''):

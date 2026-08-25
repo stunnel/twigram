@@ -41,12 +41,19 @@ class TwitterClient(object):
         :param password:
         :return: Twitter scraper
         """
+        logger.info('Logging in to Twitter with username: %s', username)
         try:
             scraper = Scraper(email=email, username=username, password=password, **self.default_params)
-            return scraper
         except Exception as e:
             logger.error('Twitter password login failed: {}'.format(e))
             return None
+
+        if getattr(scraper, 'guest', False):
+            logger.error('Twitter password login failed: got a guest session back.')
+            return None
+
+        logger.info('Twitter password login succeeded.')
+        return scraper
 
     def _create_scraper_from_cookies(self, cookie: dict):
         """
@@ -57,13 +64,23 @@ class TwitterClient(object):
         auth_token = cookie.get('auth_token', '')
         ct0 = cookie.get('ct0', '')
 
-        if auth_token and ct0:
-            try:
-                scraper = Scraper(cookies=cookie, **self.default_params)
-                return scraper
-            except Exception as e:
-                logger.error('Twitter cookie login failed: {}'.format(e))
-        return None
+        if not (auth_token and ct0):
+            logger.error('Twitter cookie is missing "auth_token" or "ct0", skipping cookie login.')
+            return None
+
+        logger.info('Logging in to Twitter with cookie')
+        try:
+            scraper = Scraper(cookies=cookie, **self.default_params)
+        except Exception as e:
+            logger.error('Twitter cookie login failed: {}'.format(e))
+            return None
+
+        if getattr(scraper, 'guest', False):
+            logger.error('Twitter cookie login failed: got a guest session back.')
+            return None
+
+        logger.info('Twitter cookie login succeeded.')
+        return scraper
 
     def twitter_account(self) -> Scraper:
         """
@@ -81,11 +98,19 @@ class TwitterClient(object):
         twitter_password = os.getenv('TWITTER_PASSWORD', '')
         twitter_cookie = os.getenv('TWITTER_COOKIE', '')
 
-        if twitter_username and twitter_email and twitter_password:
-            scraper = self._create_scraper_from_credentials(twitter_email, twitter_username, twitter_password)
-            if scraper:
-                logger.info('Twitter scraper created from credentials')
-                return scraper
+        if twitter_username or twitter_email or twitter_password:
+            if twitter_username and twitter_email and twitter_password:
+                scraper = self._create_scraper_from_credentials(twitter_email, twitter_username, twitter_password)
+                if scraper:
+                    logger.info('Twitter scraper created from credentials')
+                    return scraper
+            else:
+                missing = [name for name, value in (
+                    ('TWITTER_USERNAME', twitter_username),
+                    ('TWITTER_EMAIL', twitter_email),
+                    ('TWITTER_PASSWORD', twitter_password),
+                ) if not value]
+                logger.warning('Twitter credentials incomplete, missing %s. Skipping credential login.', missing)
 
         if twitter_cookie:
             try:
@@ -100,6 +125,8 @@ class TwitterClient(object):
                         return scraper
 
         # at last, use guest session
+        if twitter_username or twitter_email or twitter_password or twitter_cookie:
+            logger.warning('Twitter credentials/cookie were provided but login failed, falling back to guest session.')
         session = init_session()  # initialize guest session, no login required
         logger.info('Twitter scraper created from guest session')
         return Scraper(session=session, **self.default_params)

@@ -31,7 +31,7 @@ ENV WEB_URL_ENABLE=""
 # your web url for webhook mode, e.g. https://twigram.example.com
 ENV WEB_URL=""
 # port for local listening, you need a reverse proxy to forward traffic to this port
-ENV PORT=8080
+ENV PORT=58081
 ENV CERT_FILE=""
 ENV KEY_FILE=""
 ENV TWITTER_USERNAME=""
@@ -42,6 +42,6 @@ ENV PROCESS_COUNT=1
 ENV QUOTE="False"
 
 HEALTHCHECK --interval=1m --timeout=3s \
-  CMD curl --silent --fail http://127.0.0.1:58081/health || exit 1
+  CMD curl --silent --fail http://127.0.0.1:$PORT/health || exit 1
 
 CMD /app/twigram/run.sh

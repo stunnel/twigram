@@ -31,7 +31,7 @@ class TelegramBot(object):
         self.session = Session()
         self.set_bot_handler()
 
-    def poll(self):
+    async def poll(self):
         interval_default = 30.0
         _interval = os.environ.get('INTERVAL', interval_default)
         try:
@@ -40,7 +40,7 @@ class TelegramBot(object):
             interval = interval_default
             self.logger.warning('INTERVAL is not a number, use default value %s', interval)
 
-        self.application.run_polling(allowed_updates=Update.MESSAGE, poll_interval=interval)
+        await self.application.updater.start_polling(allowed_updates=Update.MESSAGE, poll_interval=interval)
 
     async def web(self, url):
         self.logger.info('Setting webhook: %s', url)
@@ -77,7 +77,7 @@ class TelegramBot(object):
             await self.web(webhook_url)
         else:
             self.logger.info('Starting bot in polling mode')
-            self.poll()
+            await self.poll()
 
     async def task(self, request):
         msg = await request.get_json()

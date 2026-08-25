@@ -13,17 +13,20 @@ app = Quart(__name__)
 
 @app.before_serving
 async def run_bot() -> None:
-    await bot.run()
     if not bot.application.running:
         logger.info('Initializing bot')
         await bot.application.initialize()
         await bot.application.start()
+    await bot.run()
 
 
 @app.after_serving
 async def stop():
     logger.info('Stopping bot')
+    if bot.application.updater and bot.application.updater.running:
+        await bot.application.updater.stop()
     await bot.application.stop()
+    await bot.application.shutdown()
 
 
 @app.get('/')

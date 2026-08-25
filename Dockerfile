@@ -42,6 +42,6 @@ ENV PROCESS_COUNT=1
 ENV QUOTE="False"
 
 HEALTHCHECK --interval=1m --timeout=3s \
-  CMD curl --silent --fail http://127.0.0.1:58081/health || exit 1
+  CMD curl --silent --fail http://127.0.0.1:$PORT/health || exit 1
 
 CMD /app/twigram/run.sh

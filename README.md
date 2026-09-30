@@ -31,6 +31,33 @@ Or you can provide valid certificate and key, the bot will run in https.
 IMPORTANT: Ports currently supported for webhooks: 443, 80, 88, 8443.
 ref: https://core.telegram.org/bots/api#setwebhook
 
+**Nginx reverse proxy sample**
+
+If you enable webhook mode by setting `WEB_URL_ENABLE` and run the bot in plain HTTP (no `CERT_FILE`/`KEY_FILE`), you need a reverse proxy in front of it to terminate TLS, since Telegram requires HTTPS.
+`WEB_URL` must match the public HTTPS address the proxy serves (e.g. `https://twigram.example.com`), and the proxy forwards traffic to the bot's local `PORT` (default `58081`).
+
+```nginx
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name twigram.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/twigram.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/twigram.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:58081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Replace `twigram.example.com` and the certificate paths with your own, and `127.0.0.1:58081` with the host/`PORT` the bot is actually listening on (e.g. the container's published port, if not using `--network host`).
+
 ### Docker
 
 1. Clone this repo

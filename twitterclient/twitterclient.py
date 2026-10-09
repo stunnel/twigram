@@ -12,6 +12,7 @@ from twitter.util import init_session
 
 from lib.utils import Session
 from lib.logger import logger
+from lib.richtext import RichText, from_note_tweet
 
 
 class TwitterClient(object):
@@ -131,7 +132,7 @@ class TwitterClient(object):
         logger.info('Twitter scraper created from guest session')
         return Scraper(session=session, **self.default_params)
 
-    async def download(self, tweet_url: str) -> tuple[list, list, str]:
+    async def download(self, tweet_url: str) -> tuple[list, list, RichText]:
         """
         Download images, videos and text from tweet url
         :param tweet_url:
@@ -142,7 +143,7 @@ class TwitterClient(object):
         images_path = await self.download_images(images_url, tweet_id)
         videos_path = await self.download_videos(videos_url, tweet_id)
 
-        text = '{}\n\n{}'.format(text, tweet_url)
+        text = text + '\n\n{}'.format(tweet_url)
         return images_path, videos_path, text
 
     def get_tweet_id(self, url: str) -> int:
@@ -246,7 +247,7 @@ class TwitterClient(object):
 
         return await self.get_largest_video(video_infos)
 
-    async def get_media_url(self, tweet_id: int) -> tuple[list, list, str]:
+    async def get_media_url(self, tweet_id: int) -> tuple[list, list, RichText]:
         """
         Get image and video url from tweet id
         :param tweet_id:
@@ -254,7 +255,7 @@ class TwitterClient(object):
         """
         image_urls, video_urls, remove_urls = [], [], []
         # remove_urls is the url of the image or video in the text, we will remove it later
-        text, name, screen_name = '', '', ''
+        text, name, screen_name = RichText(), '', ''
 
         tweet = await self.get_tweet(tweet_id)
         tweet_result = tweet['data']['tweetResult']['result']
@@ -294,16 +295,18 @@ class TwitterClient(object):
                 and 'note_tweet_results' in tweet_result['note_tweet']
                 and 'result' in tweet_result['note_tweet']['note_tweet_results']
                 and 'text' in tweet_result['note_tweet']['note_tweet_results']['result']):
-            text = tweet_result['note_tweet']['note_tweet_results']['result']['text']
+            # long tweets carry bold/italic tags, keep them as RichText spans
+            text = from_note_tweet(tweet_result['note_tweet']['note_tweet_results']['result'])
         elif 'legacy' in tweet_result and 'full_text' in tweet_result['legacy']:
             text = tweet_result['legacy']['full_text']
             media_number = len(image_urls) + len(video_urls)
             if media_number > 0 and len(remove_urls) > 0:
                 # if there are images or videos in the tweet, remove the url of the image or video in the text
                 text = self.remove_media_link_in_text(text, remove_urls)
+            text = RichText(text)
 
         if any([name, screen_name]):
-            text = f'{name} ({screen_name})\n\n{text}'
+            text = RichText(f'{name} ({screen_name})\n\n') + text
 
         tweet_data_dir = os.path.join(self.current_dir, 'data', str(tweet_id))
         # if not debug mode, remove the tweet data directory

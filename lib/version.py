@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-version = '0.2.20'
+version = '0.2.21'
 message = ('*Tweet forward Bot*',
            f'Version: {version}\n',
            '*Usage:*',

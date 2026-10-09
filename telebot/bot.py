@@ -11,12 +11,20 @@ from telegram.ext import Application, CommandHandler, MessageHandler, ContextTyp
 
 from lib.lock import FileLock
 from lib.logger import logger
-from lib.utils import Session, split_long_string
+from lib.utils import Session
 from lib.unshort import expand_urls_in_text
+from lib.richtext import RichText
 from lib import version
 from twitterclient.twitterclient import TwitterClient
 
 _url_prefixes = (r'https://(?:www\.|mobile\.|m\.)?twitter\.com/', r'https://x\.com/')
+
+
+def to_message_entities(rich_text: RichText) -> list[MessageEntity] | None:
+    entities = [MessageEntity(type=entity_type, offset=offset, length=length, url=url or None)
+                for entity_type, offset, length, url in rich_text.to_utf16_entities()]
+
+    return entities or None
 
 
 class TelegramBot(object):
@@ -155,15 +163,13 @@ class TelegramBot(object):
         else:
             await self.reply_text(update, 'Download failed.')
 
-    async def reply_text(self, update: Update, text: str):
+    async def reply_text(self, update: Update, text: str | RichText):
         quote = self.quote
-        if len(text) <= 4096:
-            await update.message.reply_text(text, do_quote=quote, disable_web_page_preview=True)
-        else:
-            text_split = split_long_string(text)
-            for text_part in text_split:
-                await update.message.reply_text(text_part, do_quote=quote, disable_web_page_preview=True)
-                quote = False
+        # Telegram counts the 4096 limit and entity offsets in UTF-16 units
+        for text_part in RichText.coerce(text).split(4096):
+            await update.message.reply_text(text_part.text, entities=to_message_entities(text_part),
+                                            do_quote=quote, disable_web_page_preview=True)
+            quote = False
 
     @staticmethod
     def is_bot_mentioned(message: Message, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -183,22 +189,28 @@ class TelegramBot(object):
 
         return False
 
-    async def send_media(self, update: Update, images_path: list[str], videos_path: list[str], text: str = ''):
-        async def relpy_media_group(caption: str = ''):
+    async def send_media(self, update: Update, images_path: list[str], videos_path: list[str],
+                         text: str | RichText = ''):
+        async def relpy_media_group(caption: str | RichText = ''):
             if medias_image or medias_video:
+                rich_caption = RichText.coerce(caption)
+                caption_entities = to_message_entities(rich_caption)
                 if total_size > 50 * 1024**2:
                     self.logger.info('Media group too large, send separately.')
                     if medias_image:
-                        await update.message.reply_media_group(media=medias_image, caption=caption,
+                        await update.message.reply_media_group(media=medias_image, caption=rich_caption.text,
+                                                               caption_entities=caption_entities,
                                                                do_quote=self.quote, write_timeout=600)
                     if medias_video:
                         for i in range(len(medias_video)):
-                            caption_temp = caption if i == 0 else ''
-                            await update.message.reply_media_group(media=[medias_video[i]], caption=caption_temp,
-                                                                   do_quote=self.quote, write_timeout=600)
+                            await update.message.reply_media_group(
+                                media=[medias_video[i]], caption=rich_caption.text if i == 0 else '',
+                                caption_entities=caption_entities if i == 0 else None,
+                                do_quote=self.quote, write_timeout=600)
                 else:
                     medias = medias_image + medias_video
-                    await update.message.reply_media_group(media=medias, caption=caption,
+                    await update.message.reply_media_group(media=medias, caption=rich_caption.text,
+                                                           caption_entities=caption_entities,
                                                            do_quote=self.quote, write_timeout=600)
 
         medias_image, medias_video = [], []
@@ -216,7 +228,7 @@ class TelegramBot(object):
             else:
                 medias_video.append(InputMediaVideo(media=open(video_path, 'rb'), supports_streaming=True))
 
-        if len(text) > 1024:
+        if RichText.coerce(text).utf16_len() > 1024:
             await relpy_media_group()
             await self.reply_text(update, text)
         else:

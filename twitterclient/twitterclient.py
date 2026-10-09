@@ -12,6 +12,8 @@ from twitter.util import init_session
 
 from lib.utils import Session
 from lib.logger import logger
+from lib.richtext import RichText, from_note_tweet
+from lib.article import find_article_link, get_cover_url, article_to_rich_text
 
 
 class TwitterClient(object):
@@ -22,6 +24,7 @@ class TwitterClient(object):
         self.audio_type = {'.m4a', '.mp3', '.flac', '.ogg'}
         self.size_limit = 1024**2 * 50      # Telegram bot API limit
         self.pattern = r'(?:https:\/\/)?(?:www\.)?(?:twitter|x)\.com\/(?:#!\/)?@?(\w{1,15})\/status\/(\d{1,})'
+        self.fx_api = 'https://api.fxtwitter.com/{}/status/{}'
         self.debug = debug
 
         self.current_dir = os.getcwd()
@@ -131,7 +134,7 @@ class TwitterClient(object):
         logger.info('Twitter scraper created from guest session')
         return Scraper(session=session, **self.default_params)
 
-    async def download(self, tweet_url: str) -> tuple[list, list, str]:
+    async def download(self, tweet_url: str) -> tuple[list, list, RichText]:
         """
         Download images, videos and text from tweet url
         :param tweet_url:
@@ -142,7 +145,7 @@ class TwitterClient(object):
         images_path = await self.download_images(images_url, tweet_id)
         videos_path = await self.download_videos(videos_url, tweet_id)
 
-        text = '{}\n\n{}'.format(text, tweet_url)
+        text = text + '\n\n{}'.format(tweet_url)
         return images_path, videos_path, text
 
     def get_tweet_id(self, url: str) -> int:
@@ -192,6 +195,23 @@ class TwitterClient(object):
         if tweets is not None and not tweets:
             raise ValueError(f'Tweet {tweet_id} not found after {max_retries} attempts')
         raise Exception(f'Failed to fetch tweet {tweet_id} after {max_retries} attempts')
+
+    async def get_article(self, screen_name: str, tweet_id: int) -> dict:
+        """
+        X does not return the content of an Article to a guest session or to twitter-api-client,
+        so ask FxTwitter, which serves it without login. Return {} if it is unavailable.
+        :param screen_name:
+        :param tweet_id:
+        :return: FxTwitter article object
+        """
+        url = self.fx_api.format(screen_name or 'i', tweet_id)
+        try:
+            resp = await self.session.get(url, timeout=20)
+            resp.raise_for_status()
+            return resp.json()['tweet'].get('article') or {}
+        except Exception as e:
+            logger.error(f'Get article of tweet {tweet_id} failed: {e}')
+            return {}
 
     async def get_largest_video(self, video_infos: list[dict]) -> str:
         """
@@ -246,7 +266,7 @@ class TwitterClient(object):
 
         return await self.get_largest_video(video_infos)
 
-    async def get_media_url(self, tweet_id: int) -> tuple[list, list, str]:
+    async def get_media_url(self, tweet_id: int) -> tuple[list, list, RichText]:
         """
         Get image and video url from tweet id
         :param tweet_id:
@@ -254,7 +274,7 @@ class TwitterClient(object):
         """
         image_urls, video_urls, remove_urls = [], [], []
         # remove_urls is the url of the image or video in the text, we will remove it later
-        text, name, screen_name = '', '', ''
+        text, name, screen_name = RichText(), '', ''
 
         tweet = await self.get_tweet(tweet_id)
         tweet_result = tweet['data']['tweetResult']['result']
@@ -294,16 +314,31 @@ class TwitterClient(object):
                 and 'note_tweet_results' in tweet_result['note_tweet']
                 and 'result' in tweet_result['note_tweet']['note_tweet_results']
                 and 'text' in tweet_result['note_tweet']['note_tweet_results']['result']):
-            text = tweet_result['note_tweet']['note_tweet_results']['result']['text']
+            # long tweets carry bold/italic tags, keep them as RichText spans
+            text = from_note_tweet(tweet_result['note_tweet']['note_tweet_results']['result'])
         elif 'legacy' in tweet_result and 'full_text' in tweet_result['legacy']:
             text = tweet_result['legacy']['full_text']
             media_number = len(image_urls) + len(video_urls)
             if media_number > 0 and len(remove_urls) > 0:
                 # if there are images or videos in the tweet, remove the url of the image or video in the text
                 text = self.remove_media_link_in_text(text, remove_urls)
+            text = RichText(text)
+
+        # the tweet only links to an Article, fetch its content and replace the link with it
+        article_link, article_id = find_article_link(tweet_result)
+        if article_id:
+            article = await self.get_article(screen_name, tweet_id)
+            article_text = article_to_rich_text(article) if article else RichText()
+            if article_text:
+                logger.info(f'Found article {article_id} of tweet {tweet_id}')
+                cover_url = get_cover_url(article)
+                if cover_url:
+                    image_urls.insert(0, cover_url)
+                text = text.sub(article_link, '').strip() if article_link else text.strip()
+                text = text + '\n\n' + article_text if text else article_text
 
         if any([name, screen_name]):
-            text = f'{name} ({screen_name})\n\n{text}'
+            text = RichText(f'{name} ({screen_name})\n\n') + text
 
         tweet_data_dir = os.path.join(self.current_dir, 'data', str(tweet_id))
         # if not debug mode, remove the tweet data directory

@@ -3,6 +3,8 @@
 import re
 from unshortenit import UnshortenIt
 
+from lib.richtext import RichText
+
 SHORT_DOMAINS = [
     'bit.ly', 't.co', 'tinyurl.com', 'goo.gl', 'ow.ly', 'buff.ly',
     'is.gd', 'rebrand.ly', 'trib.al', 'bit.do', 'soo.gd', 'cutt.ly'
@@ -23,6 +25,9 @@ def expand_urls_in_text(text):
             return full_url or short_url
         except Exception:
             return short_url
+
+    if isinstance(text, RichText):
+        return text.sub(SHORT_URL_PATTERN, replacer)
 
     return SHORT_URL_PATTERN.sub(replacer, text)
 

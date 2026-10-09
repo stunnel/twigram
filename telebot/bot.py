@@ -21,8 +21,8 @@ _url_prefixes = (r'https://(?:www\.|mobile\.|m\.)?twitter\.com/', r'https://x\.c
 
 
 def to_message_entities(rich_text: RichText) -> list[MessageEntity] | None:
-    entities = [MessageEntity(type=entity_type, offset=offset, length=length)
-                for entity_type, offset, length in rich_text.to_utf16_entities()]
+    entities = [MessageEntity(type=entity_type, offset=offset, length=length, url=url or None)
+                for entity_type, offset, length, url in rich_text.to_utf16_entities()]
 
     return entities or None
 

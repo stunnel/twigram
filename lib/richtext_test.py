@@ -172,7 +172,7 @@ class TestSplit(unittest.TestCase):
 class TestUtf16Entities(unittest.TestCase):
     def test_offsets_count_emoji_as_two(self):
         rich = bold('🔥 burn', 2, 6)
-        self.assertEqual(rich.to_utf16_entities(), [(BOLD, 3, 4)])
+        self.assertEqual(rich.to_utf16_entities(), [(BOLD, 3, 4, '')])
 
     def test_no_spans(self):
         self.assertEqual(RichText('abc').to_utf16_entities(), [])
@@ -201,7 +201,7 @@ class TestPipeline(unittest.TestCase):
 
         self.assertIn('https://example.com/a/very/long/path', rich.text)
         for chunk in rich.split(40):
-            for entity_type, offset, length in chunk.to_utf16_entities():
+            for entity_type, offset, length, _ in chunk.to_utf16_entities():
                 units = chunk.text.encode('utf-16-le')[offset * 2:(offset + length) * 2].decode('utf-16-le')
                 self.assertEqual(entity_type, BOLD)
                 self.assertEqual(units, 'BOLD')

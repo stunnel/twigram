@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 BOLD = 'bold'
 ITALIC = 'italic'
+STRIKETHROUGH = 'strikethrough'
+TEXT_LINK = 'text_link'
+BLOCKQUOTE = 'blockquote'
+PRE = 'pre'
 _STYLES = (BOLD, ITALIC)
 
 
@@ -18,6 +22,7 @@ class Span:
     type: str
     start: int  # code point index, inclusive
     end: int    # code point index, exclusive
+    url: str = ''   # only for TEXT_LINK
 
 
 def _normalize(spans, length: int) -> tuple:
@@ -26,10 +31,10 @@ def _normalize(spans, length: int) -> tuple:
     for span in spans:
         start, end = max(span.start, 0), min(span.end, length)
         if end > start:
-            by_type.setdefault(span.type, []).append([start, end])
+            by_type.setdefault((span.type, span.url), []).append([start, end])
 
     result = []
-    for span_type, ranges in by_type.items():
+    for (span_type, span_url), ranges in by_type.items():
         ranges.sort()
         merged = [ranges[0]]
         for start, end in ranges[1:]:
@@ -37,13 +42,13 @@ def _normalize(spans, length: int) -> tuple:
                 merged[-1][1] = max(merged[-1][1], end)
             else:
                 merged.append([start, end])
-        result.extend(Span(span_type, start, end) for start, end in merged)
+        result.extend(Span(span_type, start, end, span_url) for start, end in merged)
 
-    return tuple(sorted(result, key=lambda s: (s.start, -s.end, s.type)))
+    return tuple(sorted(result, key=lambda s: (s.start, -s.end, s.type, s.url)))
 
 
 class RichText:
-    """Text with bold/italic spans. Spans are kept in code point offsets and follow every edit."""
+    """Text with style spans (bold, italic, links, ...). Spans are kept in code point offsets and follow every edit."""
 
     __slots__ = ('text', 'spans')
 
@@ -87,7 +92,7 @@ class RichText:
     def __add__(self, other) -> 'RichText':
         other = RichText.coerce(other)
         shift = len(self.text)
-        shifted = [Span(s.type, s.start + shift, s.end + shift) for s in other.spans]
+        shifted = [replace(s, start=s.start + shift, end=s.end + shift) for s in other.spans]
         return RichText(self.text + other.text, list(self.spans) + shifted)
 
     def __radd__(self, other) -> 'RichText':
@@ -100,7 +105,7 @@ class RichText:
         start, end = max(start, 0), min(end, len(self.text))
         if end <= start:
             return RichText()
-        spans = [Span(s.type, max(s.start, start) - start, min(s.end, end) - start) for s in self.spans]
+        spans = [replace(s, start=max(s.start, start) - start, end=min(s.end, end) - start) for s in self.spans]
         return RichText(self.text[start:end], spans)
 
     def strip(self) -> 'RichText':
@@ -145,7 +150,7 @@ class RichText:
                 return new_end if is_end else new_start
             return pos + delta
 
-        spans = [Span(s.type, remap(s.start, False), remap(s.end, True)) for s in self.spans]
+        spans = [replace(s, start=remap(s.start, False), end=remap(s.end, True)) for s in self.spans]
         return RichText(''.join(out), spans)
 
     def split(self, limit: int) -> list['RichText']:
@@ -188,8 +193,8 @@ class RichText:
 
         return chunks
 
-    def to_utf16_entities(self) -> list[tuple[str, int, int]]:
-        """(type, offset, length) for every span, in UTF-16 code units."""
+    def to_utf16_entities(self) -> list[tuple[str, int, int, str]]:
+        """(type, offset, length, url) for every span, in UTF-16 code units."""
         if not self.spans:
             return []
 
@@ -197,7 +202,17 @@ class RichText:
         for char in self.text:
             offsets.append(offsets[-1] + (2 if ord(char) > 0xFFFF else 1))
 
-        return [(s.type, offsets[s.start], offsets[s.end] - offsets[s.start]) for s in self.spans]
+        return [(s.type, offsets[s.start], offsets[s.end] - offsets[s.start], s.url) for s in self.spans]
+
+
+def utf16_to_code_points(text: str):
+    """Return a function that converts a UTF-16 unit offset in `text` to a code point index."""
+    table = []
+    for index, char in enumerate(text):
+        table.extend([index] * (2 if ord(char) > 0xFFFF else 1))
+    table.append(len(text))
+
+    return lambda units: table[max(0, min(len(table) - 1, units))]
 
 
 def from_note_tweet(note_result: dict) -> RichText:
@@ -210,14 +225,7 @@ def from_note_tweet(note_result: dict) -> RichText:
     if not tags:
         return RichText(text)
 
-    to_code_point = []
-    for index, char in enumerate(text):
-        to_code_point.extend([index] * (2 if ord(char) > 0xFFFF else 1))
-    to_code_point.append(len(text))
-
-    def locate(units) -> int:
-        return to_code_point[max(0, min(len(to_code_point) - 1, units))]
-
+    locate = utf16_to_code_points(text)
     spans = []
     for tag in tags:
         start, end = tag.get('from_index'), tag.get('to_index')

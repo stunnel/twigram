@@ -31,6 +31,10 @@ class TelegramBot(object):
         self.session = Session()
         self.set_bot_handler()
 
+        self.webhook_enabled = False
+        self.webhook_success = None
+        self.webhook_url = None
+
     async def poll(self):
         interval_default = 30.0
         _interval = os.environ.get('INTERVAL', interval_default)
@@ -44,6 +48,7 @@ class TelegramBot(object):
 
     async def web(self, url):
         self.logger.info('Setting webhook: %s', url)
+        self.webhook_url = url
 
         # Check if webhook is already configured, avoid API response 429 Too Many Requests
         # See https://core.telegram.org/bots/api#setwebhook
@@ -51,19 +56,26 @@ class TelegramBot(object):
         if webhook_info:
             if webhook_info.url == url:
                 self.logger.info('Webhook already configured.')
+                self.webhook_success = True
                 return
 
         lock_acquired = self.webhook_lock.acquire()
         if lock_acquired:
-            result = await self.application.bot.set_webhook(url=url, allowed_updates=Update.MESSAGE)
+            try:
+                result = await self.application.bot.set_webhook(url=url, allowed_updates=Update.MESSAGE)
 
-            if result:
-                self.logger.info('Webhook setup OK, URL: %s', url)
-            else:
-                self.logger.info('Webhook setup FAILED, URL: %s', url)
-                raise Exception('Webhook setup failed.')
-
-            self.webhook_lock.release()
+                if result:
+                    self.logger.info('Webhook setup OK, URL: %s', url)
+                    self.webhook_success = True
+                else:
+                    self.logger.info('Webhook setup FAILED, URL: %s', url)
+                    self.webhook_success = False
+                    raise Exception('Webhook setup failed.')
+            except Exception:
+                self.webhook_success = False
+                raise
+            finally:
+                self.webhook_lock.release()
         else:
             self.logger.info('Acquire lock failed, other process is setting webhook.')
             return
@@ -71,13 +83,21 @@ class TelegramBot(object):
     async def run(self):
         self.logger.info(f'Starting bot')
         if os.environ.get('WEB_URL_ENABLE') in {'True', 'true', 'TRUE', '1'}:
+            self.webhook_enabled = True
             web_url = os.environ.get('WEB_URL')
             webhook_url = '{}/twigram/{}/down'.format(web_url, self.get_token())
             self.logger.info(f'Starting bot in webhook mode with url: {web_url}/twigram/TOKEN/down')
             await self.web(webhook_url)
         else:
+            self.webhook_enabled = False
             self.logger.info('Starting bot in polling mode')
             await self.poll()
+
+    def masked_webhook_url(self) -> str:
+        if not self.webhook_url:
+            return self.webhook_url
+
+        return self.webhook_url.replace(self.get_token(), '***')
 
     async def task(self, request):
         msg = await request.get_json()

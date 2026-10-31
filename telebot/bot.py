@@ -129,6 +129,7 @@ class TelegramBot(object):
         self.application.add_handler(CommandHandler('down', self.download))
         self.application.add_handler(CommandHandler('download', self.download))
         self.application.add_handler(MessageHandler((filters.TEXT | filters.CAPTION) & ~filters.COMMAND, self.download))
+        self.application.add_error_handler(self.error_handler)
 
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -154,14 +155,33 @@ class TelegramBot(object):
             await self.download_twitter(update, url)
 
     async def download_twitter(self, update: Update, url: str):
-        images_path, videos_path, text = await self.client.download(url)
-        text = expand_urls_in_text(text)
-        if len(images_path) + len(videos_path) > 0:
-            await self.send_media(update=update, images_path=images_path, videos_path=videos_path, text=text)
-        elif text:
+        images_path, videos_path = [], []
+        try:
+            images_path, videos_path, text = await self.client.download(url)
+            text = expand_urls_in_text(text)
+            if len(images_path) + len(videos_path) > 0:
+                await self.send_media(update=update, images_path=images_path, videos_path=videos_path, text=text)
+            elif text:
+                await self.reply_text(update, text)
+            else:
+                await self.reply_text(update, 'Download failed.')
+        except Exception:
+            self.logger.exception('Download %s failed', url)
+            await self.reply_error(update, f'Download failed: {url}')
+        finally:
+            self.client.remove_files(images_path + videos_path)
+
+    async def reply_error(self, update: Update, text: str):
+        # the failure may come from Telegram itself, don't let the reply raise again
+        try:
             await self.reply_text(update, text)
-        else:
-            await self.reply_text(update, 'Download failed.')
+        except Exception:
+            self.logger.exception('Failed to send error message')
+
+    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE):
+        self.logger.error('Failed to handle update: %s', update, exc_info=context.error)
+        if isinstance(update, Update):
+            await self.reply_error(update, 'Something went wrong, please try again later.')
 
     async def reply_text(self, update: Update, text: str | RichText):
         quote = self.quote
@@ -233,17 +253,6 @@ class TelegramBot(object):
             await self.reply_text(update, text)
         else:
             await relpy_media_group(caption=text)
-
-        if not self.debug:
-            await self.delete_files(images_path, videos_path)
-
-    @staticmethod
-    async def delete_files(images_path: list[str], videos_path: list[str]):
-        for image_path in images_path:
-            os.remove(image_path)
-
-        for video_path in videos_path:
-            os.remove(video_path)
 
     async def get_urls(self, message: Message) -> list:
         urls = []

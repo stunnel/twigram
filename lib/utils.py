@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
 import httpx
 import re
 from urllib.parse import urlparse
 
 from lib.logger import logger
+
+RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class Session(httpx.AsyncClient):
@@ -21,8 +24,56 @@ class Session(httpx.AsyncClient):
         limits = httpx.Limits(max_connections=connections * 2, max_keepalive_connections=connections)
         http_transport = httpx.AsyncHTTPTransport(http2=True, retries=retries, verify=False, limits=limits)
 
-        super().__init__(headers=self.default_header, transport=http_transport)
+        timeout = httpx.Timeout(30, connect=10)
+
+        super().__init__(headers=self.default_header, transport=http_transport, timeout=timeout)
         self.session = self
+
+    @staticmethod
+    def should_retry(error: Exception) -> bool:
+        # connection failures are already retried by the transport
+        if isinstance(error, (httpx.ConnectError, httpx.ConnectTimeout)):
+            return False
+        if isinstance(error, httpx.HTTPStatusError):
+            return error.response.status_code in RETRY_STATUS_CODES
+        return isinstance(error, httpx.TransportError)
+
+    async def retry(self, func, url: str, max_attempts: int = 4):
+        """
+        Call func until it succeeds, waiting 1s, 2s, 4s between attempts.
+        Only network errors and RETRY_STATUS_CODES are retried, the last error is raised.
+        :param func: async function without arguments
+        :param url: for logging
+        :param max_attempts:
+        :return: result of func
+        """
+        attempt = 1
+        while True:
+            try:
+                return await func()
+            except (httpx.TransportError, httpx.HTTPStatusError) as e:
+                if attempt >= max_attempts or not self.should_retry(e):
+                    raise
+                logger.info(f'Request {url} failed: {e!r}, retrying... ({attempt}/{max_attempts})')
+
+            await asyncio.sleep(2 ** (attempt - 1))
+            attempt += 1
+
+    async def request_with_retry(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """
+        Send a request with retries.
+        :return: the last response, its status code may still be an error
+        """
+        async def send():
+            response = await self.request(method, url, **kwargs)
+            if response.status_code in RETRY_STATUS_CODES:
+                response.raise_for_status()
+            return response
+
+        try:
+            return await self.retry(send, url)
+        except httpx.HTTPStatusError as e:
+            return e.response
 
     async def url_strict(self, url: str) -> str:
         """

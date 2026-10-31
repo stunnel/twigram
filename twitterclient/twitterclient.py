@@ -7,6 +7,7 @@ import re
 import asyncio
 from urllib.parse import urlparse
 
+import httpx
 from twitter.scraper import Scraper
 from twitter.util import init_session
 
@@ -143,7 +144,11 @@ class TwitterClient(object):
         tweet_id = self.get_tweet_id(tweet_url)
         images_url, videos_url, text = await self.get_media_url(tweet_id)
         images_path = await self.download_images(images_url, tweet_id)
-        videos_path = await self.download_videos(videos_url, tweet_id)
+        try:
+            videos_path = await self.download_videos(videos_url, tweet_id)
+        except Exception:
+            self.remove_files(images_path)
+            raise
 
         text = text + '\n\n{}'.format(tweet_url)
         return images_path, videos_path, text
@@ -171,6 +176,7 @@ class TwitterClient(object):
         logger.info(f'Downloading tweet: {tweet_id}')
         retries = 0
         max_retries = 10
+        tweets = None
 
         while retries < max_retries:
             try:
@@ -188,8 +194,9 @@ class TwitterClient(object):
                 retries += 1
                 logger.info(f'Error fetching tweet {tweet_id}: {e}, retrying... ({retries}/{max_retries})')
 
-            # Wait with exponential backoff before retrying
-            await asyncio.sleep(2 * retries)
+            # Wait longer after each failure before retrying
+            if retries < max_retries:
+                await asyncio.sleep(2 * retries)
 
         # After max retries, raise appropriate error
         if tweets is not None and not tweets:
@@ -227,7 +234,7 @@ class TwitterClient(object):
 
         if not video_url:
             for video_info in video_infos:
-                resp = await self.session.head(video_info['url'])
+                resp = await self.session.request_with_retry('HEAD', video_info['url'])
                 if resp.status_code == 200:
                     content_length = int(resp.headers.get('Content-Length', 0))
                     if bitrate < content_length <= self.size_limit:
@@ -378,18 +385,22 @@ class TwitterClient(object):
         filename_list = []
         length = len(images_urls)
 
-        for i in range(length):
-            image_url = images_urls[i]
-            logger.info(f'Downloading image: {image_url}')
-            r = await self.session.get(image_url)
-            if r.status_code == 200:
-                filename = urlparse(image_url).path.split('/')[-1]
-                filename = '{}/{}_{}_{}'.format(self.temp_dir, tweet_id, i, filename)
-                with open(filename, 'wb') as f:
-                    f.write(r.content)
-                filename_list.append(filename)
-            else:
-                logger.error(f'Failed to download image: {image_url}')
+        try:
+            for i in range(length):
+                image_url = images_urls[i]
+                logger.info(f'Downloading image: {image_url}')
+                r = await self.session.request_with_retry('GET', image_url)
+                if r.status_code == 200:
+                    filename = urlparse(image_url).path.split('/')[-1]
+                    filename = '{}/{}_{}_{}'.format(self.temp_dir, tweet_id, i, filename)
+                    with open(filename, 'wb') as f:
+                        f.write(r.content)
+                    filename_list.append(filename)
+                else:
+                    logger.error(f'Failed to download image: {image_url}')
+        except Exception:
+            self.remove_files(filename_list)
+            raise
 
         return filename_list
 
@@ -403,15 +414,46 @@ class TwitterClient(object):
         file_list = []
         length = len(video_urls)
 
-        for i in range(length):
-            video_url = video_urls[i]
-            logger.info(f'Downloading video: {video_url}')
-            async with self.session.stream(method='GET', url=video_url) as resp:
+        try:
+            for i in range(length):
+                video_url = video_urls[i]
+                logger.info(f'Downloading video: {video_url}')
                 filename = urlparse(video_url).path.split('/')[-1]
                 filename = '{}/{}_{}_{}'.format(self.temp_dir, tweet_id, i, filename)
-                with open(filename, 'wb') as f:
-                    async for chunk in resp.aiter_bytes():
-                        f.write(chunk)
                 file_list.append(filename)
+                try:
+                    await self.session.retry(lambda: self.save_stream(video_url, filename), video_url)
+                except httpx.HTTPStatusError as e:
+                    logger.error(f'Failed to download video: {video_url}, status code {e.response.status_code}')
+                    file_list.remove(filename)
+        except Exception:
+            self.remove_files(file_list)
+            raise
 
         return file_list
+
+    async def save_stream(self, url: str, filename: str):
+        """
+        Stream url into filename, a retry starts the file over
+        :param url:
+        :param filename:
+        :return:
+        """
+        async with self.session.stream(method='GET', url=url) as resp:
+            resp.raise_for_status()
+            with open(filename, 'wb') as f:
+                async for chunk in resp.aiter_bytes():
+                    f.write(chunk)
+
+    def remove_files(self, files: list[str]):
+        """
+        Remove downloaded files that will not be sent
+        :param files:
+        :return:
+        """
+        if self.debug:
+            return
+
+        for file in files:
+            if os.path.exists(file):
+                os.remove(file)

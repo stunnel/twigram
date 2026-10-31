@@ -154,7 +154,13 @@ class TelegramBot(object):
             await self.download_twitter(update, url)
 
     async def download_twitter(self, update: Update, url: str):
-        images_path, videos_path, text = await self.client.download(url)
+        try:
+            images_path, videos_path, text = await self.client.download(url)
+        except Exception:
+            self.logger.exception('Download %s failed', url)
+            await self.reply_text(update, f'Download failed: {url}')
+            return
+
         text = expand_urls_in_text(text)
         if len(images_path) + len(videos_path) > 0:
             await self.send_media(update=update, images_path=images_path, videos_path=videos_path, text=text)
